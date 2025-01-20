@@ -1,58 +1,9 @@
+use crate::user_manager::UserManager;
 use futures_util::{SinkExt, StreamExt};
-use std::collections::HashMap;
 use std::error::Error;
-use std::sync::Arc;
 use tokio::net::TcpListener;
-use tokio::sync::{broadcast, Mutex};
+use tokio::sync::broadcast;
 use tokio_tungstenite::{accept_async, tungstenite::Message};
-
-// User structure for managing connected users
-#[derive(Debug, Clone)]
-struct User {
-    username: String,
-    peer_address: String,
-}
-
-// In-memory user manager for managing connected users
-#[derive(Clone)]
-struct UserManager {
-    users: Arc<Mutex<HashMap<String, User>>>,
-}
-
-// UserManager implementation
-impl UserManager {
-    fn new() -> Self {
-        UserManager {
-            // Initialize an empty hashmap for storing users
-            users: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
-
-    // Add a new user to the manager
-    async fn add_user(&self, username: String, peer_address: String) {
-        let user = User {
-            username: username.clone(),
-            peer_address: peer_address.clone(),
-        };
-        self.users.lock().await.insert(username.clone(), user);
-    }
-
-    // Remove a user from the manager
-    async fn remove_user(&self, peer_address: &str) {
-        self.users.lock().await.remove(peer_address); // Remove the user from the user manager
-    }
-
-    // List all connected users
-    async fn list_users(&self) -> Vec<User> {
-        // Lock the users map and collect all usernames
-        self.users
-            .lock() // Lock the users map
-            .await // Wait for the lock to be acquired
-            .values() // Get the values of the users map
-            .cloned() // Clone the User values instead of just their usernames
-            .collect() // Collect the usernames into a vector
-    }
-}
 
 // Handle a single WebSocket connection
 async fn handle_connection(
@@ -110,7 +61,7 @@ async fn handle_connection(
                     // If the message is a text message
                     let message = format!("[{}] {}", username, msg); // Format the message with the username and the message
                     if let Err(e) = broadcaster.send(message.clone()) {
-                        return Err("Failed to send message to broadcaster: {}".into());
+                        return Err(format!("Failed to send message to broadcaster: {}", e).into());
                     }
                 }
             }

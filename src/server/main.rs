@@ -1,4 +1,5 @@
 mod server;
+mod user_manager; // Ensure server is also declared
 use std::error::Error; // Import the Error trait
 
 // This is the main function that will start the server
