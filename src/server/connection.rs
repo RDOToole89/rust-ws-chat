@@ -1,4 +1,4 @@
-use crate::message::message_type::parse_message;
+use crate::message::message_type::{parse_message, to_json, MessageType};
 use crate::server::router::route_message;
 use crate::server::user_manager::UserManager;
 use futures_util::{SinkExt, StreamExt};
@@ -16,7 +16,9 @@ pub async fn handle_connection(
     let (mut write, mut read) = ws_stream.split();
 
     write
-        .send(Message::text("Enter your username:".to_string()))
+        .send(Message::text(to_json(&MessageType::SystemMessage(
+            "Enter your username:".to_string(),
+        ))?))
         .await?;
 
     let username = if let Some(Ok(Message::Text(name))) = read.next().await {
@@ -30,7 +32,10 @@ pub async fn handle_connection(
         .await;
 
     let join_message = format!("*** {} has joined the chat ***", username);
-    broadcaster.send(join_message.clone()).unwrap_or_default();
+    let join_message_type = MessageType::SystemMessage(join_message);
+    broadcaster
+        .send(to_json(&join_message_type)?)
+        .unwrap_or_default();
 
     let read_task = {
         let broadcaster = broadcaster.clone();
@@ -64,7 +69,10 @@ pub async fn handle_connection(
     user_manager.remove_user(&peer_address).await;
 
     let leave_message = format!("*** {} has left the chat ***", username);
-    broadcaster.send(leave_message.clone()).unwrap_or_default();
+    let leave_message_type = MessageType::SystemMessage(leave_message);
+    broadcaster
+        .send(to_json(&leave_message_type)?)
+        .unwrap_or_default();
 
     Ok(())
 }
