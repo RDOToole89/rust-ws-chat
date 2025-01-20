@@ -6,8 +6,8 @@ use tokio::sync::Mutex;
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct User {
-    username: String,
-    peer_address: String,
+    pub username: String,
+    pub peer_address: String,
 }
 
 // In-memory user manager for managing connected users
