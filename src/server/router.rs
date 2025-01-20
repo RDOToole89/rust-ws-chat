@@ -10,11 +10,18 @@ pub async fn route_message(
     broadcaster: &broadcast::Sender<String>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     match message {
-        MessageType::ChatMessage { sender, content } => {
-            handle_chat_message(sender, content, &broadcaster).await?;
+        MessageType::ChatMessage {
+            sender,
+            receiver,
+            content,
+        } => {
+            handle_chat_message(sender, receiver, content, &broadcaster).await?;
         }
-        MessageType::SystemMessage(system_message) => {
-            handle_system_message(system_message, &broadcaster).await?;
+        MessageType::SystemMessage {
+            message_type,
+            content,
+        } => {
+            handle_system_message(message_type, content, &broadcaster).await?;
         }
         MessageType::UserList(_) => {
             let users = user_manager
@@ -28,8 +35,8 @@ pub async fn route_message(
             let serialized = serde_json::to_string(&user_list_message)?;
             broadcaster.send(serialized).unwrap_or_default();
         }
-        MessageType::Command(_) => {
-            // Handle command or do nothing for now
+        MessageType::Command(command) => {
+            println!("[INFO]: Received command: {}", command);
         }
     }
 

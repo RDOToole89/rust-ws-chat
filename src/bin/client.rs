@@ -1,7 +1,8 @@
 use futures_util::{SinkExt, StreamExt}; // Provides utilities for streams and sinks, used for WebSocket communication
-use rust_ws_chat::message::message_type::{parse_message, MessageType};
+use rust_ws_chat::message::message_type::{parse_message, to_json, MessageType};
 use tokio::io::{self, AsyncBufReadExt, BufReader}; // Used for reading user input from stdin
 use tokio_tungstenite::connect_async; // Asynchronous WebSocket connection function // Import MessageType enum and parse_message function for JSON parsing
+use tokio_tungstenite::tungstenite::Message;
 
 #[tokio::main] // Marks the main function as an async function using the Tokio runtime
 async fn main() {
@@ -24,39 +25,53 @@ async fn main() {
             match msg {
                 // Handle a Text message (JSON string) received from the server
                 Ok(tokio_tungstenite::tungstenite::Message::Text(raw_message)) => {
-                    // Attempt to parse the raw JSON string into the MessageType enum
                     match parse_message(&raw_message) {
                         Ok(message_type) => match message_type {
-                            // If it's a SystemMessage, print the message
-                            MessageType::SystemMessage(message) => println!("{}", message),
-
-                            // If it's a ChatMessage, display the sender and content
-                            MessageType::ChatMessage { sender, content } => {
-                                println!("{}: {}", sender, content);
+                            // If it's a SystemMessage, print it as-is
+                            MessageType::SystemMessage {
+                                message_type,
+                                content,
+                            } => {
+                                println!("[{}]: {}", message_type, content)
                             }
 
-                            // If it's a UserList message, print the list of users
-                            MessageType::UserList(users) => println!("Users: {:?}", users),
+                            // If it's a ChatMessage, print the sender and content
+                            MessageType::ChatMessage {
+                                sender,
+                                receiver,
+                                content,
+                            } => {
+                                println!("[{}]: {}", sender, content);
+                            }
 
-                            // Placeholder for unknown message types (in case you add more in the future)
-                            _ => println!("Unknown message type"),
+                            // If it's a UserList, print the list of users
+                            MessageType::UserList(users) => {
+                                println!("[SYSTEM]: Connected users: {:?}", users);
+                            }
+
+                            // Handle unknown or unimplemented message types
+                            _ => println!("[SYSTEM]: Unknown message type received"),
                         },
-
-                        // Handle JSON parsing errors
-                        Err(e) => println!("Failed to parse message: {:?}", e),
+                        Err(e) => {
+                            // Handle errors in JSON parsing
+                            eprintln!("[ERROR]: Failed to parse message: {:?}", e);
+                        }
                     }
                 }
 
-                // Ignore other WebSocket message types (e.g., binary, ping, pong, close)
+                // Ignore non-text WebSocket messages
                 Ok(_) => {}
 
-                // Handle errors while receiving messages
-                Err(e) => println!("Error: {:?}", e),
+                // Handle WebSocket errors
+                Err(e) => {
+                    eprintln!("[ERROR]: WebSocket error: {:?}", e);
+                }
             }
         }
     });
 
     // Create a buffered reader for user input from stdin
+    // `BufReader` is used to wrap `stdin`, making it easier to read lines of text input from the user asynchronously.
     let stdin = BufReader::new(io::stdin());
     let mut lines = stdin.lines();
 
@@ -64,13 +79,28 @@ async fn main() {
 
     // Main loop to read user input and send messages to the server
     while let Ok(Some(line)) = lines.next_line().await {
-        // Attempt to send the user's input as a message to the server
-        if let Err(e) = socket_sender.send(line.into()).await {
+        // Create a `ChatMessage` variant of the `MessageType` enum.
+        // This represents a structured chat message that includes the sender's name and the message content.
+        let message_type = MessageType::ChatMessage {
+            sender: "client".to_string(), // Sender is hardcoded as "client" for now.
+            receiver: "all".to_string(),
+            content: line.clone(), // User's input is used as the message content.
+        };
+
+        // Serialize the `MessageType` enum instance into a JSON string.
+        // This step ensures the data adheres to the agreed-upon structure for communication with the server.
+        let serialized_message = to_json(&message_type).unwrap();
+
+        // Wrap the serialized JSON string in a `Message::Text`, which is a WebSocket-compatible text message.
+        // Send the message to the server using the WebSocket connection.
+        if let Err(e) = socket_sender.send(Message::Text(serialized_message)).await {
+            // If sending fails, print an error message and exit the loop.
             eprintln!("Failed to send message: {}", e);
-            break; // Exit the loop if sending fails
+            break;
         }
     }
 
-    // This will only execute if the loop breaks (e.g., due to an error or user exiting)
+    // This will only execute if the loop breaks (e.g., due to an error or user exiting).
+    // It indicates the client has disconnected from the server.
     println!("Client disconnected from server");
 }

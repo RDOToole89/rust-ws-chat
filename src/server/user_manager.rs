@@ -27,12 +27,23 @@ impl UserManager {
     }
 
     // Add a new user to the manager
-    pub async fn add_user(&self, username: String, peer_address: String) {
+    pub async fn add_user(&self, username: &str, peer_address: &str) {
+        // Comparison: String vs. &str
+        // String: Owns its data
+        // &str: Borrows data
+        // Memory Allocation: &str is a pointer to a string in memory
+        // Memory Management: String is allocated on the heap, &str is borrowed from the heap
+        // Mutability: String is mutable, &str is immutable
+        // Data Passed: Full string content (owned)
+
+        // By default, println! with {} will show the contents of a &str.
+        // To see the memory address of a &str, use the {:p} format specifier.
+
         let user = User {
-            username: username.clone(),
-            peer_address: peer_address.clone(),
+            username: username.to_string(),         // converts &str to String
+            peer_address: peer_address.to_string(), // converts &str to String
         };
-        self.users.lock().await.insert(username.clone(), user);
+        self.users.lock().await.insert(username.to_string(), user);
     }
 
     // Remove a user from the manager

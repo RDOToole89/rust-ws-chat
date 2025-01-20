@@ -3,8 +3,15 @@ use serde::{Deserialize, Serialize};
 // Emum for different types of messages
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MessageType {
-    SystemMessage(String),
-    ChatMessage { sender: String, content: String },
+    SystemMessage {
+        message_type: String,
+        content: String,
+    },
+    ChatMessage {
+        sender: String,
+        receiver: String,
+        content: String,
+    },
     UserList(Vec<String>),
     Command(String),
 }
